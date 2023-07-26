@@ -1,0 +1,271 @@
+
+# Project: Investigate a Dataset - [tmdb-movies]
+
+## Table of Contents
+<ul>
+<li><a href="#intro">Introduction</a></li>
+<li><a href="#wrangling">Data Wrangling</a></li>
+<li><a href="#eda">Exploratory Data Analysis</a></li>
+<li><a href="#conclusions">Conclusions</a></li>
+</ul>
+
+<a id='intro'></a>
+## Introduction
+
+### Dataset Description 
+
+Database TMDb has a lot informations about 10,000 movies around the world and its cast, revenue ,production_companies, director and popularity, in this presentation we will answer some questions regarding this data such as who is the most popular cast, most revenue and some correlations between variables. Lets explore this dataset.
+
+
+### Question(s) for Analysis
+Question 1 (Most released genres over years? )
+
+Question 2 (Highest and lowest Movie profit)
+
+Question 3 (Highest and lowest Movie genres profit)
+
+Question 4 (Exploring runtime of the movies; the average runtime and percentage above and below this average)
+
+Question 5 (What about profits and its correlation with runtime of movies, Is it a strong correlation ? , let's explore.)
+
+
+# Use this cell to set up import statements for all of the packages that you
+#   plan to use.
+
+# Remember to include a 'magic word' so that your visualizations are plotted
+#   inline with the notebook. See this page for more:
+#   http://ipython.readthedocs.io/en/stable/interactive/magics.html
+
+import pandas as pd
+import numpy as np
+import csv
+from datetime import datetime
+import matplotlib.pyplot as plt
+% matplotlib inline
+
+# Upgrade pandas to use dataframe.explode() function. 
+!pip install --upgrade pandas==0.25.0
+
+<a id='wrangling'></a>
+## Data Wrangling
+
+In this section I will explore our dataset and try to fix every error might cause a problem in our investigation
+
+### General Properties
+At the beginning we will Read the dataset
+# Load your data and print out a few lines. 
+df = pd.read_csv('tmdb-movies.csv')
+Trying to discover dataset content by Showing the first 5 rows
+
+df.head()
+
+Showing our dataset in numerical way
+#explore Data Shape
+df.shape
+our Dataset consists of 10866 rows and 21 columns.
+
+
+### Data Cleaning
+#### We need to discover errors and fix it before starting our investigation to make sure that our results are accurate and clear:
+
+1- some columns will be usless so we can drop those columns.
+
+2- some numerical columns have a zero value which makes our data confused about the minimum, average and max values for these column, So we can chnage it to NAN
+
+3- Some values are missing for more than one column, So we must fix this by using average for numerical columns and drop the missing values for strings, After all the remaing count of values must be the same for all columns.
+
+4- for release_date; it must converted to date format to can be readable.
+
+5- for two columns ( budget and revenue ) must be integer values to can be useful in extracting numeric values we need for our investigation
+
+
+# Let's drop usless columns.
+
+df.drop(['id', 'imdb_id','tagline','budget_adj', 'revenue_adj', 'homepage', 'keywords', 'overview' , 'vote_count', 'vote_average'], axis = 1, inplace = True)
+
+df.head()
+
+#Now we must know the new shape of our data after dropping useless columns
+df.shape
+Dataset new shape consists of 10866 rows and 11 columns.
+
+#Now let's show up some statistical data like percentile, mean and std of the numerical values of the dataset to give us some notes about the maximum, minimum and mean values.
+df.describe()
+
+It's clear from these numerical numbers that there are some ZEROs values that causes inaccuracy for the results, we must fix that by replacing every Zero value by NAN for budget and revenue columns.
+
+#Let's Start with Budget column
+df['budget'] = df['budget'].replace(0, np.NAN)
+
+#Now Revenue column
+df['revenue'] = df['revenue'].replace(0, np.NAN)
+Now let's show the numerical values again
+
+df.describe()
+
+#Now we have to show the number of Nan values.
+df.info()
+we should dropp every Nan values to can get the same numbers of values in each column.
+
+df[df.revenue.isnull()]
+df.dropna(inplace=True)
+df.info()
+
+#Now we should present every column values type to make sure they are aligned with the investigation we want to do.
+df.dtypes
+
+#### some columns need to change the type of its values:
+1-we should convert values of release date to be datetime type to can be readable.
+
+2-we should convert each of Revenue and budget to integer type.
+
+#let's start with converting release date column
+df.release_date = pd.to_datetime(df['release_date'])
+
+#now Revenue column turn
+df['revenue'] = df['revenue'].apply(int)
+
+#Finally Budget column
+df['budget'] = df['budget'].apply(int)
+
+df.dtypes
+
+
+Now we are sure that data types are ready to be investigated.
+
+
+<a id='eda'></a>
+## Exploratory Data Analysis
+
+
+
+### Research Question 1 (Most released genres over years? )
+
+
+#to answer this question we should make a function to split the string and return the count of each genre by groupby
+# split the genres string
+df.genres = df.genres.str.split('|')
+# using explode to creat row of each genre
+df = df.explode('genres')
+# making groupby between (release_year and geners) with popularity to can make a correlation between them
+df.groupby(['release_year','genres'])['popularity'].mean().groupby(level='release_year').nlargest(1)
+# reset data index to make more clear and getting rid of extra rows
+data = df.groupby(['release_year','genres'])['popularity'].mean().groupby(level='release_year').nlargest(1).reset_index(level=0, drop=True)
+# abbreviate the data by only using the first 10 row
+data = data.head()
+data.plot(kind= 'barh')
+plt.title("Most released genres over years",fontsize=13)
+plt.xlabel('Movies',fontsize=10)
+plt.ylabel("Genres",fontsize= 10)
+
+
+### this graph shows that for year 1964, Action movies were the most genres released and for 1963, Adventure movies were the most released genre.
+
+
+### Research Question 2 (Highest and lowest Movie profit)
+## to answer this question we must create a new column (profit)
+df.insert(2,'profit',df['revenue']-df['budget'])
+df.head()
+
+#to know the title of the movies with the max an mini profit, we should create a groupby to get the movies titles of profits
+df.groupby('original_title').profit.max()
+
+#now let's visualize the relation between profits and movies titles
+data = df.groupby('original_title').profit.max()
+data = data.head()
+#bar chart is the proper kind of charts to visualize this correlation
+data.plot(kind= 'bar')
+plt.title("MAx and Mini movies profit",fontsize=13)
+plt.xlabel('Movies',fontsize=10)
+plt.ylabel("profit",fontsize= 10)
+
+
+### this graph shows that the max profit belongs to movie ( 101 Dalmatians) and the mini profit is for movie (10 things I hate about you )
+
+
+### Research Question 3 (Highest and lowest Movie genres profit)
+
+#to know the genres of the movies with the max an mini profit, we should create a groupby to get the movies genres of profits
+data = df.groupby('genres').profit.max()
+data = data.head()
+#visualizing this correlation
+data.plot(kind= 'bar')
+plt.title("MAx and Mini movies profit",fontsize=13)
+plt.xlabel('Movies',fontsize=10)
+plt.ylabel("profit",fontsize= 10)
+
+### this graph shows that the max profit belongs to Action and Adventure movies and the mini profit is for comedy and animation movies 
+
+### Research Question 4 (Exploring runtime of the movies; the average runtime and percentage above and below this average)
+
+#creating function to calculate the average of any column
+def average_fun(column):
+    return df[column].mean()
+
+#calling average function for runtime column
+average_fun ('runtime')
+
+All our movies in this dataset has an average runtime 109 minutes.
+
+### Let's try to know more specific details about runtime of movies above and below this average by visualizing this numerical values
+
+#this box plot of the runtime of the movies can show the mean, mode and the  
+plt.figure(figsize=(8,8), dpi = 100)
+boxplot = df.boxplot(column=['runtime'])
+
+plt.show()
+
+df['runtime'].describe()
+
+### from the box plot with the above numerical values we can infer that the mean ( average ) of runtime is can not be a acuurate for the most rutime of all movies as :
+
+#### 75 % of movies have runtime  less than 119 minutes
+#### 50 %  of movies have runtime less than 109 minutes
+
+
+### Research Question 5 (What about profits and its correlation with runtime of movies, Is it a strong correlation ? , let's explore.
+
+#best investigation to find out this correlation is to visualise it
+profits_runtime = df.groupby('runtime').profit.max()
+plt.plot(profits_runtime)
+plt.xlabel('runtime of Movies')
+plt.ylabel('Profits')
+###It's very obvious that NOT the more runtime of the movie increases the more it gets profits and not the extremley short runtime movies got good profit as well, 
+##the maximum profits are limited in range (100:150) minutes
+
+### Research Question 6 (changing in profit values through release years of movies)
+
+#to answer this question we must sum the values of profits for each release year to can sketch the correlation between them.
+#lets make a new groupby between the sum of profits and release year
+profits_year = df.groupby('release_year')['profit'].sum()
+
+#now let's visualize the correlation
+plt.figure(figsize=(10,5), dpi = 100)
+plt.plot(profits_year)
+
+# creating a function to get the max value in our data of any column
+def max_fun(column):
+    return df[column].max()
+
+#calling the max function for the profit column
+max_fun ('profit')
+
+#show up wich year this max profit has been gained
+profits_year.idxmax()
+
+### from the numerical values and the graph we can Concludes that the max profit has been gained in 2015 and over the previous years the profits has been lower
+
+<a id='conclusions'></a>
+# Conclusions
+
+In the first section I examined the most genres of movies has been released over the decades, After that the main engine for me was the profit, I investigated the movies with the max and minimum profit after that I made my analyzation for the genres with the max and minimum profit.
+
+Finally, I analyzed the runtime of the movies and it's corelation with profits.
+
+#Limitations
+in the first section and before starting analyzing the data, I made some repair modifications on some columns such budget_adj, revenue and release date, Maybe that will distort results from my investigation.
+All correlations I did and visualise in this investigation, Maybe there are another factors behind this values not only this two variables but no doubt they have impact about each other like we shown up in the graphs above
+
+from subprocess import call
+call(['python', '-m', 'nbconvert', 'Investigate_a_Dataset.ipynb'])
+
